@@ -69,7 +69,7 @@ col opts =
 -- | The conversion process.
 convert :: Options -> T.Text -> IO T.Text
 convert (EnsemblInfo { descriptionField = df }) =
-    fmap unEnsemblDesc
+    fmap (fromMaybe "" . fmap unEnsemblDesc)
         . toEnsemblDesc ( maybe Description read
                         . unHelpful
                         $ df

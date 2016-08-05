@@ -31,12 +31,15 @@ import Types
 
 -- | Null the null value of an object. If the object is Null, return "".
 nullNull :: Value -> Parser T.Text
-nullNull (String x) = return $ x
-nullNull _          = return $ ""
+nullNull (String x)  = return $ x
+nullNull _           = return $ ""
 
 -- | Decode a Ensembl id query as an Ensembl identifier.
 decodeEnsemblAnn :: CL.ByteString -> Maybe EnsemblAnn
-decodeEnsemblAnn query = getENSG (eitherDecode query :: Either String ([Map.Map T.Text T.Text]))
+decodeEnsemblAnn ""    = Nothing
+decodeEnsemblAnn query = getENSG ( eitherDecode query
+                                :: Either String ([Map.Map T.Text T.Text])
+                                 )
   where
     getENSG = fmap EnsemblAnn
             . headMay
@@ -46,6 +49,7 @@ decodeEnsemblAnn query = getENSG (eitherDecode query :: Either String ([Map.Map 
 
 -- | Decode a Ensembl id query as a description of the id.
 decodeEnsemblDesc :: EnsemblDescFields -> CL.ByteString -> EnsemblDesc
+decodeEnsemblDesc _ ""        = EnsemblDesc ""
 decodeEnsemblDesc field query =
     EnsemblDesc
         . T.intercalate "/"
@@ -68,6 +72,7 @@ decodeEnsemblDesc field query =
 
 -- | Get Ensembl annotation.
 toEnsemblAnn :: UnknownAnn -> IO (Maybe EnsemblAnn)
+toEnsemblAnn (UnknownAnn "")    = return Nothing
 toEnsemblAnn (UnknownAnn query) = do
     let base     = "http://rest.ensembl.org/"
         xrefs    = "xrefs/symbol/homo_sapiens/"
@@ -83,7 +88,8 @@ toEnsemblAnn (UnknownAnn query) = do
     return ensemblAnn
 
 -- | Get Ensembl description.
-toEnsemblDesc :: EnsemblDescFields -> UnknownAnn -> IO EnsemblDesc
+toEnsemblDesc :: EnsemblDescFields -> UnknownAnn -> IO (Maybe EnsemblDesc)
+toEnsemblDesc _ (UnknownAnn "")        = return Nothing
 toEnsemblDesc field (UnknownAnn query) = do
     let base     = "http://rest.ensembl.org/"
         xrefs    = "xrefs/id/"
@@ -92,6 +98,8 @@ toEnsemblDesc field (UnknownAnn query) = do
 
     xrefRsp   <- simpleHTTP (getRequest xrefReq) >>= getResponseBody
 
-    let ensemblDesc = decodeEnsemblDesc field . CL.pack $ xrefRsp
+    let ensemblDesc = case xrefRsp of
+                        "[]" -> Nothing
+                        x    -> Just . decodeEnsemblDesc field . CL.pack $ x
 
     return ensemblDesc
