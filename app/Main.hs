@@ -39,11 +39,15 @@ data Options = EnsemblInfo { delimiter        :: Maybe String
                                              <?> "([Description] | Synonyms) The info to retrieve about the identifier. Description provides information about the identifier while synonyms provides alternate identifiers for the same entity. Returns a list of information (delimited by '/') for each match to Ensembl's cross references."
                            , column           :: T.Text
                                              <?> "(COLUMN) The column containing the identifier. Must be an Ensembl id for info."
+                           , remove           :: Bool
+                                             <?> "Whether to remove empty results (no matches to the database)."
                            }
              | EnsemblAnnotation { delimiter :: Maybe String
                                             <?> "([,] | CHAR) The delimiter of the CSV file."
                                  , column    :: T.Text
                                             <?> "(COLUMN) The column containing the identifier. Must be an Ensembl id for info."
+                                 , remove    :: Bool
+                                            <?> "Whether to remove empty results (no matches to the database)."
                                  }
                deriving (Generic)
 
@@ -62,7 +66,9 @@ pipeConvert opts = do
     forever $ do
         x    <- await
         newX <- lift . convert opts . (!! c) $ x
-        yield . L.set (L.ix c) newX $ x
+        unless
+            ((unHelpful . remove $ opts) && T.null newX)
+            (yield . L.set (L.ix c) newX $ x)
         return ()
 
     return ()
