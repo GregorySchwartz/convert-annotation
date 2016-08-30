@@ -19,11 +19,15 @@ import Data.Aeson
 
 
 -- Algebraic
-data EnsemblDescFields = Synonyms | Description deriving (Read, Show)
+data Database = Ensembl | UniProt deriving (Read, Show)
+data DescFields = UniProtOther T.Text
+                | Synonyms
+                | Description
+                  deriving (Read,Show)
 
 -- Basic
 newtype UnknownAnn  = UnknownAnn { unUnknownAnn :: T.Text }
-newtype EnsemblAnn  = EnsemblAnn { unEnsemblAnn :: T.Text }
-newtype EnsemblDesc = EnsemblDesc { unEnsemblDesc :: T.Text }
+newtype Ann         = Ann { unAnn :: T.Text }
+newtype Desc        = Desc { unDesc :: T.Text }
 
 -- Advanced

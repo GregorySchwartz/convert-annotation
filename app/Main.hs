@@ -1,7 +1,7 @@
 {- convert-annotation
 Gregory W. Schwartz
 
-Converts an unknown annotation to Ensembl's annotation.
+Converts an unknown annotation to Ensembl's annotation, or other annotation.
 -}
 
 {-# LANGUAGE DataKinds         #-}
@@ -30,25 +30,30 @@ import Options.Generic
 
 -- Local
 import Types
-import Convert
+import EnsemblConvert
+import UniProtConvert
 
 -- | Command line arguments
-data Options = EnsemblInfo { delimiter        :: Maybe String
-                                             <?> "([,] | CHAR) The delimiter of the CSV file."
-                           , descriptionField :: Maybe String
-                                             <?> "([Description] | Synonyms) The info to retrieve about the identifier. Description provides information about the identifier while synonyms provides alternate identifiers for the same entity. Returns a list of information (delimited by '/') for each match to Ensembl's cross references."
-                           , column           :: T.Text
-                                             <?> "(COLUMN) The column containing the identifier. Must be an Ensembl id for info."
-                           , remove           :: Bool
-                                             <?> "Whether to remove empty results (no matches to the database)."
-                           }
-             | EnsemblAnnotation { delimiter :: Maybe String
-                                            <?> "([,] | CHAR) The delimiter of the CSV file."
-                                 , column    :: T.Text
-                                            <?> "(COLUMN) The column containing the identifier. Must be an Ensembl id for info."
-                                 , remove    :: Bool
-                                            <?> "Whether to remove empty results (no matches to the database)."
-                                 }
+data Options = Info { delimiter        :: Maybe String
+                                      <?> "([,] | CHAR) The delimiter of the CSV file."
+                    , database         :: String
+                                      <?> "(Ensembl | UniProt) Which database to convert with."
+                    , descriptionField :: String
+                                      <?> "(Other TEXT | Description | Synonyms) The info to retrieve about the identifier. Description provides information about the identifier while synonyms provides alternate identifiers for the same entity. Returns a list of information (delimited by '/') for each match to Ensembl's cross references. For UniProt, enter a valid column (http://www.uniprot.org/help/programmatic_access)."
+                    , column           :: T.Text
+                                      <?> "(COLUMN) The column containing the identifier. Must be a valid id for info."
+                    , remove           :: Bool
+                                      <?> "Whether to remove empty results (no matches to the database)."
+                    }
+             | Annotation { delimiter :: Maybe String
+                                     <?> "([,] | CHAR) The delimiter of the CSV file."
+                          , database  :: String
+                                     <?> "(Ensembl | UniProt) Which database to convert with."
+                          , column    :: T.Text
+                                     <?> "(COLUMN) The column containing the identifier. Must be a valid id for info."
+                          , remove    :: Bool
+                                     <?> "Whether to remove empty results (no matches to the database)."
+                          }
                deriving (Generic)
 
 instance ParseRecord Options
@@ -80,20 +85,26 @@ col opts =
 
 -- | The conversion process.
 convert :: Options -> T.Text -> IO T.Text
-convert (EnsemblInfo { descriptionField = df }) =
-    fmap (fromMaybe "" . fmap unEnsemblDesc)
-        . toEnsemblDesc ( maybe Description read
-                        . unHelpful
-                        $ df
-                        )
+convert opts@(Info { descriptionField = df }) =
+    fmap (fromMaybe "" . fmap unDesc)
+        . whichDesc (read . unHelpful . database $ opts)
         . UnknownAnn
-convert (EnsemblAnnotation {})                  =
-    fmap (fromMaybe "" . fmap unEnsemblAnn) . toEnsemblAnn . UnknownAnn
+  where
+    whichDesc Ensembl = toEnsemblDesc (read . unHelpful $ df)
+    whichDesc UniProt = toUniProtDesc (read . unHelpful $ df)
+convert opts@(Annotation {})                  =
+    fmap (fromMaybe "" . fmap unAnn)
+        . whichDesc (read . unHelpful . database $ opts)
+        . UnknownAnn
+  where
+    whichDesc Ensembl = toEnsemblAnn
+    whichDesc UniProt = toUniProtAnn
 
 main :: IO ()
 main = do
     opts <- getRecord "convert-annotation, Gregory W. Schwartz.\
-                      \ Converts an unknown annotation to Ensembl's annotation."
+                      \ Converts an unknown annotation to some other\
+                      \ annotation."
 
     let delim = case unHelpful . delimiter $ opts of
                     Nothing         -> ','
