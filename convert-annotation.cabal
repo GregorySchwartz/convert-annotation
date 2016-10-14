@@ -17,12 +17,16 @@ library
   hs-source-dirs:      src
   exposed-modules:     Types
                      , EnsemblConvert
+                     , HUGOConvert
                      , UniProtConvert
   build-depends:       base >= 4.7 && < 5
                      , containers
                      , bytestring
                      , text
                      , aeson
+                     , lens
+                     , lens-aeson
+                     , wreq
                      , HTTP
                      , safe
 

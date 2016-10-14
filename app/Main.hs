@@ -31,13 +31,14 @@ import Options.Generic
 -- Local
 import Types
 import EnsemblConvert
+import HUGOConvert
 import UniProtConvert
 
 -- | Command line arguments
 data Options = Info { delimiter        :: Maybe String
                                       <?> "([,] | CHAR) The delimiter of the CSV file."
                     , database         :: String
-                                      <?> "(Ensembl | UniProt) Which database to convert with."
+                                      <?> "(Ensembl | HUGO TYPE | UniProt) Which database to convert with. TYPE is the type of the original gene symbol. The compatible list is in http://www.genenames.org/help/rest-web-service-help. HUGO is only supported for Annotation."
                     , descriptionField :: String
                                       <?> "(Other TEXT | Description | Synonyms) The info to retrieve about the identifier. Description provides information about the identifier while synonyms provides alternate identifiers for the same entity. Returns a list of information (delimited by '/') for each match to Ensembl's cross references. For UniProt, enter a valid column (http://www.uniprot.org/help/programmatic_access)."
                     , column           :: T.Text
@@ -48,7 +49,7 @@ data Options = Info { delimiter        :: Maybe String
              | Annotation { delimiter :: Maybe String
                                      <?> "([,] | CHAR) The delimiter of the CSV file."
                           , database  :: String
-                                     <?> "(Ensembl | UniProt) Which database to convert with."
+                                     <?> "(Ensembl | HUGO TYPE | UniProt) Which database to convert with. TYPE is the type of the original gene symbol. The compatible list is in http://www.genenames.org/help/rest-web-service-help. HUGO is only supported for Annotation."
                           , column    :: T.Text
                                      <?> "(COLUMN) The column containing the identifier. Must be a valid id for info."
                           , remove    :: Bool
@@ -90,15 +91,17 @@ convert opts@(Info { descriptionField = df }) =
         . whichDesc (read . unHelpful . database $ opts)
         . UnknownAnn
   where
-    whichDesc Ensembl = toEnsemblDesc (read . unHelpful $ df)
-    whichDesc UniProt = toUniProtDesc (read . unHelpful $ df)
+    whichDesc Ensembl  = toEnsemblDesc (read . unHelpful $ df)
+    whichDesc (HUGO _) = error "HUGO description not yet supported."
+    whichDesc UniProt  = toUniProtDesc (read . unHelpful $ df)
 convert opts@(Annotation {})                  =
     fmap (fromMaybe "" . fmap unAnn)
-        . whichDesc (read . unHelpful . database $ opts)
+        . whichAnn (read . unHelpful . database $ opts)
         . UnknownAnn
   where
-    whichDesc Ensembl = toEnsemblAnn
-    whichDesc UniProt = toUniProtAnn
+    whichAnn Ensembl          = toEnsemblAnn
+    whichAnn (HUGO queryType) = toHUGOAnn . HUGOType $ queryType
+    whichAnn UniProt          = toUniProtAnn
 
 main :: IO ()
 main = do

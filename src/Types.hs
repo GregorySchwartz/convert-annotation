@@ -19,7 +19,7 @@ import Data.Aeson
 
 
 -- Algebraic
-data Database = Ensembl | UniProt deriving (Read, Show)
+data Database = Ensembl | HUGO T.Text | UniProt deriving (Read, Show)
 data DescFields = UniProtOther T.Text
                 | Synonyms
                 | Description
@@ -29,5 +29,6 @@ data DescFields = UniProtOther T.Text
 newtype UnknownAnn  = UnknownAnn { unUnknownAnn :: T.Text }
 newtype Ann         = Ann { unAnn :: T.Text }
 newtype Desc        = Desc { unDesc :: T.Text }
+newtype HUGOType    = HUGOType { unHUGOType :: T.Text }
 
 -- Advanced
