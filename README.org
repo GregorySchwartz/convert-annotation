@@ -1,5 +1,17 @@
 * convert-annotation
 
+Very early stages. Mix between =HTTP= and =wreq= libraries, need to fully
+convert to =wreq= in the future.
+
+Each mode, =info= or =annotation=, has its own help.
+
+Main usage to convert, say, some unknown annotation to Ensembl annotation in a
+=csv=:
+
+#+BEGIN_SRC sh
+cat input.csv | convert-annotation annotation --database "Ensembl" --column "gene"
+#+END_SRC
+
 #+BEGIN_SRC sh :exports results :results value code
 convert-annotation -h
 #+END_SRC
