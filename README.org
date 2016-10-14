@@ -1,0 +1,21 @@
+* convert-annotation
+
+#+BEGIN_SRC sh :exports results :results value code
+convert-annotation -h
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC sh
+convert-annotation, Gregory W. Schwartz. Converts an unknown annotation to some
+other annotation.
+
+Usage: convert-annotation (info | annotation)
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  info                     
+  annotation               
+#+END_SRC
+
