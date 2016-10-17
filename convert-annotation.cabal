@@ -1,7 +1,7 @@
 name:                convert-annotation
 version:             0.2.0.1
 synopsis:            Convert the annotation of a gene to another in a delimited file using a variety of different databases.
-description:         Please see README.md
+description:         Please see README.org
 homepage:            http://github.com/GregorySchwartz/convert-annotation#readme
 license:             GPL-3
 license-file:        LICENSE
@@ -10,7 +10,7 @@ maintainer:          gsch@mail.med.upenn.edu
 copyright:           Copyright: (c) 2016 Gregory W. Schwartz
 category:            Bioinformatics
 build-type:          Simple
--- extra-source-files:
+extra-source-files:  README.org
 cabal-version:       >=1.10
 
 library
