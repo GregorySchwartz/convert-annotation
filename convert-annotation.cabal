@@ -1,5 +1,5 @@
 name:                convert-annotation
-version:             0.4.0.0
+version:             0.5.0.0
 synopsis:            Convert the annotation of a gene to another in a delimited file using a variety of different databases.
 description:         Please see README.org
 homepage:            http://github.com/GregorySchwartz/convert-annotation#readme
