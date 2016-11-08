@@ -21,6 +21,8 @@ import GHC.Generics
 import Data.Semigroup
 
 -- Cabal
+import qualified Data.Vector as V
+import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Csv as CSV
 import qualified Control.Lens as L
@@ -57,6 +59,8 @@ data Options = Info { delimiter        :: Maybe String
                                       <?> "([Nothing] | COLUMN) The new column to put the results into. If unspecified, replaces the original column."
                     , remove           :: Bool
                                       <?> "Whether to remove empty results (no matches to the database)."
+                    , strict           :: Bool
+                                      <?> "Whether to load everything in memory, no streaming. Useful for the R conversions only."
                     }
              | Annotation { delimiter :: Maybe String
                                      <?> "([,] | CHAR) The delimiter of the CSV file."
@@ -68,6 +72,8 @@ data Options = Info { delimiter        :: Maybe String
                                      <?> "([Nothing] | COLUMN) The new column to put the results into. If unspecified, replaces the original column."
                           , remove    :: Bool
                                      <?> "Whether to remove empty results (no matches to the database)."
+                          , strict    :: Bool
+                                     <?> "Whether to load everything in memory, no streaming. Useful for the R conversions only."
                           }
                deriving (Generic)
 
@@ -89,7 +95,7 @@ pipeConvert opts rMart rData = do
 
     forever $ do
         x    <- await
-        newX <- lift . convert opts rMart rData . (!! c) $ x
+        newX <- lift . convertSingle opts rMart rData . (!! c) $ x
         unless ((unHelpful . remove $ opts) && T.null newX)
             . maybe (yield . L.set (L.ix c) newX $ x)
                     (const (yield (x <> [newX])))
@@ -102,10 +108,39 @@ pipeConvert opts rMart rData = do
 col :: Options -> [T.Text] -> Int
 col opts =
     fromMaybe (error "Column not found.") . elemIndex (unHelpful $ column opts)
+    
+-- | Convert the entire file at once, no streaming.
+strictConvert :: Options
+              -> Maybe (RMart s)
+              -> Maybe (RData s)
+              -> [[T.Text]]
+              -> IO ()
+strictConvert opts rMart rData (h:body) = do
+    let c      = col opts h
+        newCol = unHelpful . newColumn $ opts
 
--- | The conversion process.
-convert :: Options -> Maybe (RMart s) -> Maybe (RData s) -> T.Text -> IO T.Text
-convert opts@(Info { descriptionField = df }) rMart rData =
+    let newH  = maybe h (\x -> h <> [x]) $ newCol
+        xs    = fmap (!! c) body
+        
+    newXS <- convertMultiple opts rMart rData $ xs
+
+    let addToRow newX row =
+            if (unHelpful . remove $ opts) && (T.null newX)
+                then Nothing
+                else Just
+                   . maybe (L.set (L.ix c) newX row) (\x -> row <> [newX])
+                   $ newCol
+        newBody          = catMaybes . zipWith addToRow newXS $ body
+
+    B.putStrLn . CSV.encode . (:) newH $ newBody
+
+-- | The conversion process for streaming.
+convertSingle :: Options
+              -> Maybe (RMart s)
+              -> Maybe (RData s)
+              -> T.Text
+              -> IO T.Text
+convertSingle opts@(Info { descriptionField = df }) rMart rData =
     fmap (fromMaybe "" . fmap unDesc)
         . whichDesc (read . unHelpful . database $ opts)
         . UnknownAnn
@@ -127,7 +162,7 @@ convert opts@(Info { descriptionField = df }) rMart rData =
             (fromJust rData)
             (fromJust rMart)
             (MSigDBType queryType)
-convert opts@(Annotation {}) rMart rData                  =
+convertSingle opts@(Annotation {}) rMart rData                  =
     fmap (fromMaybe "" . fmap unAnn)
         . whichAnn (read . unHelpful . database $ opts)
         . UnknownAnn
@@ -137,6 +172,51 @@ convert opts@(Annotation {}) rMart rData                  =
     whichAnn UniProt           = toUniProtAnn
     whichAnn (RGene queryType) =
         toRGeneAnn (fromJust rMart) (RType queryType)
+    whichAnn (MSigDBRData _)   =
+        error "MSigDBRData annotation not yet supported."
+        
+-- | The conversion process for all in memory.
+convertMultiple :: Options
+                -> Maybe (RMart s)
+                -> Maybe (RData s)
+                -> [T.Text]
+                -> IO [T.Text]
+convertMultiple opts@(Info { descriptionField = df }) rMart rData =
+    fmap (fmap (fromMaybe "" . fmap unDesc))
+        . whichDesc (read . unHelpful . database $ opts)
+        . fmap UnknownAnn
+  where
+    whichDesc Ensembl  =
+        mapM ( toEnsemblDesc ( read
+                             . fromMaybe (error "Needs description field.")
+                             . unHelpful
+                             $ df
+                             )
+             )
+    whichDesc (HUGO _) = error "HUGO description not yet supported."
+    whichDesc UniProt  =
+        mapM (toUniProtDesc ( read
+                            . fromMaybe (error "Needs description field.")
+                            . unHelpful
+                            $ df
+                            )
+             )
+    whichDesc (RGene _) = error "RGene description not yet supported."
+    whichDesc (MSigDBRData queryType) =
+        toMSigDBPathwaysMultiple
+            (fromJust rData)
+            (fromJust rMart)
+            (MSigDBType queryType)
+convertMultiple opts@(Annotation {}) rMart rData                  =
+    fmap (fmap (fromMaybe "" . fmap unAnn))
+        . whichAnn (read . unHelpful . database $ opts)
+        . fmap UnknownAnn
+  where
+    whichAnn Ensembl           = mapM toEnsemblAnn
+    whichAnn (HUGO queryType)  = mapM (toHUGOAnn . HUGOType $ queryType)
+    whichAnn UniProt           = mapM toUniProtAnn
+    whichAnn (RGene queryType) =
+        toRGeneAnnMultiple (fromJust rMart) (RType queryType)
     whichAnn (MSigDBRData _)   =
         error "MSigDBRData annotation not yet supported."
 
@@ -165,10 +245,21 @@ main = do
                         fmap Just . getRData (File file) $ object
                     _                                 -> return Nothing
 
-        liftIO $ runEffect $ decodeWith csvOpts NoHeader PB.stdin
-            >-> P.concat
-            >-> (pipeConvert opts rMart rData)
-            >-> encode
-            >-> PB.stdout
+        if unHelpful . strict $ opts
+            then do
+                contents <- liftIO B.getContents
+                liftIO
+                    . strictConvert opts rMart rData
+                    . V.toList
+                    . either error id
+                    $ ( CSV.decode NoHeader contents
+                     :: Either String (V.Vector [T.Text])
+                      )
+            else
+                liftIO $ runEffect $ decodeWith csvOpts NoHeader PB.stdin
+                    >-> P.concat
+                    >-> (pipeConvert opts rMart rData)
+                    >-> encode
+                    >-> PB.stdout
 
         return ()

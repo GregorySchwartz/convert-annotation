@@ -25,6 +25,7 @@ library
                      , containers
                      , bytestring
                      , text
+                     , deepseq
                      , aeson
                      , lens
                      , lens-aeson
@@ -43,6 +44,7 @@ executable convert-annotation
   build-depends:       base
                      , convert-annotation
                      , optparse-generic
+                     , vector
                      , bytestring
                      , text
                      , cassava
