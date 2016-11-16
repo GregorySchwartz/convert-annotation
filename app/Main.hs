@@ -108,7 +108,7 @@ pipeConvert opts rMart rData = do
 col :: Options -> [T.Text] -> Int
 col opts =
     fromMaybe (error "Column not found.") . elemIndex (unHelpful $ column opts)
-    
+
 -- | Convert the entire file at once, no streaming.
 strictConvert :: Options
               -> Maybe (RMart s)
@@ -121,7 +121,7 @@ strictConvert opts rMart rData (h:body) = do
 
     let newH  = maybe h (\x -> h <> [x]) $ newCol
         xs    = fmap (!! c) body
-        
+
     newXS <- convertMultiple opts rMart rData $ xs
 
     let addToRow newX row =
@@ -174,7 +174,7 @@ convertSingle opts@(Annotation {}) rMart rData                  =
         toRGeneAnn (fromJust rMart) (RType queryType)
     whichAnn (MSigDBRData _)   =
         error "MSigDBRData annotation not yet supported."
-        
+
 -- | The conversion process for all in memory.
 convertMultiple :: Options
                 -> Maybe (RMart s)
