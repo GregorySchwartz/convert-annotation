@@ -1,7 +1,7 @@
 * convert-annotation
 
-Very early stages. Mix between =HTTP= and =wreq= libraries, need to fully
-convert to =wreq= in the future.
+Very early stages. Mix between =HTTP= and =req= libraries, need to fully
+convert to =req= in the future.
 
 Each mode, =info= or =annotation=, has its own help.
 
