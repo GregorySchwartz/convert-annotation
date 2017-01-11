@@ -13,36 +13,39 @@ module HUGOConvert
 
 -- Standard
 import Data.Monoid
+import Control.Exception (throwIO)
 
 -- Cabal
 import qualified Data.Text as T
 import Data.Aeson
 import Data.Aeson.Lens
 import Control.Lens
-import Network.Wreq
+import Network.HTTP.Req
 import Safe
 
 -- Local
 import Types
 
+instance MonadHttp IO where
+    handleHttpException = throwIO
+
 -- | Get the HUGO annotation.
 toHUGOAnn :: HUGOType -> UnknownAnn -> IO (Maybe Ann)
 toHUGOAnn _ (UnknownAnn "") = return Nothing
 toHUGOAnn (HUGOType queryType) (UnknownAnn query) = do
-    let opts = set (header "Accept") ["application/json"] defaults
+    let opts = header "Accept" "application/json"
 
-    r <- getWith opts
-       $ "http://rest.genenames.org/search/"
-      <> T.unpack queryType
-      <> "/"
-      <> T.unpack query
+    r <- req GET
+            (http "rest.genenames.org" /: "search" /: queryType /: query)
+            NoReqBody
+            jsonResponse
+            opts
 
-    let getSymbols = responseBody
-                   . key "response"
+    let getSymbols = key "response"
                    . key "docs"
                    . _Array
                    . traverse
                    . key "symbol"
                    . _String
 
-    return . fmap Ann . headMay . toListOf getSymbols $ r
+    return . fmap Ann . headMay . toListOf getSymbols $ (responseBody r :: Value)
