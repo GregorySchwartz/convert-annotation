@@ -30,7 +30,7 @@ data Database
     = Ensembl
     | HUGO T.Text
     | UniProt
-    | RGene (String, String)
+    | RGene (String, String, String)
     | MSigDBRData (String, String, String)
     deriving (Read,Show)
 data DescFields = UniProtOther T.Text
@@ -46,7 +46,7 @@ newtype Ann         = Ann { unAnn :: T.Text }
 newtype Desc        = Desc { unDesc :: T.Text }
                       deriving (NFData)
 newtype HUGOType    = HUGOType { unHUGOType :: T.Text }
-newtype RType       = RType { unRType :: (String, String) }
+newtype RType       = RType { unRType :: (String, String, String) }
 newtype MSigDBType  = MSigDBType { unMSigDBType :: (String, String, String) }
 newtype RMart s     = RMart { unRMart :: (R.SomeSEXP s) }
 newtype RData s     = RData { unRData :: (R.SomeSEXP s) }

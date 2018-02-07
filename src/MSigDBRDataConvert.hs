@@ -63,7 +63,11 @@ toMSigDBPathways
     -> IO (Maybe Desc)
 toMSigDBPathways _ _ _ (UnknownAnn "")            = return Nothing
 toMSigDBPathways rData rMart (MSigDBType (_, _, !from)) query = R.runRegion $ do
-    entrez <- io . toRGeneAnn rMart (RType (from, "entrezgene")) $ query
+    entrez <- io
+            . toRGeneAnn
+                rMart
+                (RType ("hsapiens_gene_ensembl", from, "entrezgene"))
+            $ query
     maybe (return Nothing) (io . getPathway rData) $ entrez
 
 -- | Get the R mapping of multiple genes to pathways.
@@ -74,5 +78,8 @@ toMSigDBPathwaysMultiple
     -> [UnknownAnn]
     -> IO [Maybe Desc]
 toMSigDBPathwaysMultiple rData rMart (MSigDBType (_, _, !from)) queries = do
-      entrez <- toRGeneAnnMultiple rMart (RType (from, "entrezgene")) $ queries
+      entrez <- toRGeneAnnMultiple
+                    rMart
+                    (RType ("hsapiens_gene_ensembl", from, "entrezgene"))
+              $ queries
       mapM (maybe (return Nothing) (getPathway rData)) entrez

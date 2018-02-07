@@ -49,8 +49,8 @@ import MSigDBRDataConvert
 -- | Command line arguments
 data Options = Info { delimiter        :: Maybe String
                                       <?> "([,] | CHAR) The delimiter of the CSV file."
-                    , database         :: String
-                                      <?> "(Ensembl | HUGO TYPE | UniProt | RGene (TYPE, TYPE) | MSigDBRdata (FILE, RDATA, TYPE)) Which database to convert with. TYPE is the type of the original gene symbol. The compatible list for TYPE with HUGO is in http://www.genenames.org/help/rest-web-service-help. HUGO is only supported for Annotation. RGene (Annotation only) takes in a type of (FROM, TO) for the gene symbol origin and destination. MSigDBRdata (Info only) takes an rdata file (tested with http://bioinf.wehi.edu.au/software/MSigDB/), the name of the rdata object containing the named list, and the TYPE of symbol (compatable list at http://bioconductor.org/packages/release/bioc/manuals/biomaRt/man/biomaRt.pdf in getGene) which returns pathways separated by \"/\"."
+                    , database  :: String
+                                     <?> "(Ensembl | HUGO TYPE | UniProt | RGene (SPECIES, TYPE, TYPE) | MSigDBRdata (FILE, RDATA, TYPE)) Which database to convert with. TYPE is the type of the original gene symbol. The compatible list for TYPE with HUGO is in http://www.genenames.org/help/rest-web-service-help. HUGO is only supported for Annotation. RGene (Annotation only) takes in a type of (SPECIES, FROM, TO) for the gene symbol origin and destination, where species is generally \"hsapiens_gene_ensembl\" or \"mmusculus_gene_ensembl\". MSigDBRdata (Info only) takes an rdata file (tested with http://bioinf.wehi.edu.au/software/MSigDB/), the name of the rdata object containing the named list, and the TYPE of symbol (compatible list at http://bioconductor.org/packages/release/bioc/manuals/biomaRt/man/biomaRt.pdf in getGene) which returns pathways separated by \"/\"."
                     , descriptionField :: Maybe String
                                       <?> "(Other TEXT | Description | Synonyms) The info to retrieve about the identifier. Description provides information about the identifier while synonyms provides alternate identifiers for the same entity. Returns a list of information (delimited by '/') for each match to Ensembl's cross references. For UniProt, enter a valid column (http://www.uniprot.org/help/programmatic_access)."
                     , column           :: T.Text
@@ -65,7 +65,7 @@ data Options = Info { delimiter        :: Maybe String
              | Annotation { delimiter :: Maybe String
                                      <?> "([,] | CHAR) The delimiter of the CSV file."
                           , database  :: String
-                                     <?> "(Ensembl | HUGO TYPE | UniProt | RGene (TYPE, TYPE) | MSigDBRdata (FILE, RDATA, TYPE)) Which database to convert with. TYPE is the type of the original gene symbol. The compatible list for TYPE with HUGO is in http://www.genenames.org/help/rest-web-service-help. HUGO is only supported for Annotation. RGene (Annotation only) takes in a type of (FROM, TO) for the gene symbol origin and destination. MSigDBRdata (Info only) takes an rdata file (tested with http://bioinf.wehi.edu.au/software/MSigDB/), the name of the rdata object containing the named list, and the TYPE of symbol (compatable list at http://bioconductor.org/packages/release/bioc/manuals/biomaRt/man/biomaRt.pdf in getGene) which returns pathways separated by \"/\"."
+                                     <?> "(Ensembl | HUGO TYPE | UniProt | RGene (SPECIES, TYPE, TYPE) | MSigDBRdata (FILE, RDATA, TYPE)) Which database to convert with. TYPE is the type of the original gene symbol. The compatible list for TYPE with HUGO is in http://www.genenames.org/help/rest-web-service-help. HUGO is only supported for Annotation. RGene (Annotation only) takes in a type of (SPECIES, FROM, TO) for the gene symbol origin and destination, where species is generally \"hsapiens_gene_ensembl\" or \"mmusculus_gene_ensembl\". MSigDBRdata (Info only) takes an rdata file (tested with http://bioinf.wehi.edu.au/software/MSigDB/), the name of the rdata object containing the named list, and the TYPE of symbol (compatible list at http://bioconductor.org/packages/release/bioc/manuals/biomaRt/man/biomaRt.pdf in getGene) which returns pathways separated by \"/\"."
                           , column    :: T.Text
                                      <?> "(COLUMN) The column containing the identifier. Must be a valid id for info."
                           , newColumn :: Maybe T.Text
@@ -115,12 +115,13 @@ strictConvert :: Options
               -> Maybe (RData s)
               -> [[T.Text]]
               -> IO ()
+strictConvert _ _ _ []                  = error "Empty file."
+strictConvert _ _ _ (_:[])              = error "Empty file."
 strictConvert opts rMart rData (h:body) = do
     let c      = col opts h
         newCol = unHelpful . newColumn $ opts
-
-    let newH  = maybe h (\x -> h <> [x]) $ newCol
-        xs    = fmap (!! c) body
+        newH   = maybe h (\x -> h <> [x]) $ newCol
+        xs     = fmap (!! c) body
 
     newXS <- convertMultiple opts rMart rData $ xs
 
@@ -237,8 +238,8 @@ main = do
 
     R.withEmbeddedR R.defaultConfig $ R.runRegion $ do
         rMart <- case read . unHelpful . database $ opts of
-                    (RGene _)       -> fmap Just getRMart
-                    (MSigDBRData _) -> fmap Just getRMart
+                    (RGene (species, _, _)) -> fmap Just $ getRMart species
+                    (MSigDBRData _) -> fmap Just $ getRMart "hsapiens_gene_ensembl"
                     _               -> return Nothing
         rData <- case read . unHelpful . database $ opts of
                     (MSigDBRData (!file, !object, _)) ->

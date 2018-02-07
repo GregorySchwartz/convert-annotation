@@ -32,16 +32,16 @@ import Language.R.Literal as R
 import Types
 
 -- | Get the R mapping of gene to gene.
-getRMart :: R s (RMart s)
-getRMart = fmap RMart
+getRMart :: String -> R s (RMart s)
+getRMart species = fmap RMart
          $ [r| library(biomaRt)
-               mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+               mart = useMart("ensembl", dataset=species_hs)
            |]
 
 -- | Get the R mapping of gene to gene.
 toRGeneAnn :: RMart s -> RType -> UnknownAnn -> IO (Maybe Ann)
 toRGeneAnn _ _ (UnknownAnn "")            = return Nothing
-toRGeneAnn rMart (RType (!from, !to)) (UnknownAnn textQuery) =
+toRGeneAnn rMart (RType (_, !from, !to)) (UnknownAnn textQuery) =
     (fmap . fmap) Ann $ R.runRegion $ do
       let query = T.unpack textQuery
           mart  = unRMart rMart
@@ -60,7 +60,7 @@ toRGeneAnn rMart (RType (!from, !to)) (UnknownAnn textQuery) =
 
 -- | Get the R mapping of a list of genes to genes.
 toRGeneAnnMultiple :: RMart s -> RType -> [UnknownAnn] -> IO [Maybe Ann]
-toRGeneAnnMultiple rMart (RType (!from, !to)) textQueries = R.runRegion $ do
+toRGeneAnnMultiple rMart (RType (_, !from, !to)) textQueries = R.runRegion $ do
     let queries = fmap (T.unpack . unUnknownAnn) textQueries
         mart    = unRMart rMart
     res <- [r| getBM( attributes = c(from_hs, to_hs)
